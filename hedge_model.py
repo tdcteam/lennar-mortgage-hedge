@@ -1,0 +1,46 @@
+
+import pandas as pd
+import numpy as np
+
+def simulate_hedge_pnl(pipeline_csv, coverage=0.90, rate_vol=0.005, n_sims=10000):
+    """
+    Simulate P&L distribution for mortgage pipeline hedging.
+
+    Parameters:
+    - pipeline_csv: Path to CSV file with columns: notional_usd, duration_years, pull_through_rate.
+    - coverage: Hedge coverage ratio (e.g., 0.80, 0.90, 0.95).
+    - rate_vol: Annualized rate volatility (std dev in decimal, e.g., 0.005 for 50 bps).
+    - n_sims: Number of Monte Carlo simulations.
+
+    Returns:
+    - DataFrame with P&L simulation summary and full simulation results.
+    """
+    df = pd.read_csv(pipeline_csv)
+    total_notional = (df['notional_usd'] * df['pull_through_rate']).sum()
+    avg_duration = (df['duration_years'] * df['notional_usd']).sum() / df['notional_usd'].sum()
+
+    # Simulate rate changes
+    delta_rate = np.random.normal(0, rate_vol, n_sims)
+
+    # Calculate P&L for each simulation
+    pnl = -avg_duration * delta_rate * total_notional + coverage * avg_duration * delta_rate * total_notional
+
+    summary = {
+        'coverage': coverage,
+        'total_notional': total_notional,
+        'avg_duration': avg_duration,
+        'mean_pnl': pnl.mean(),
+        'std_pnl': pnl.std(),
+        'p5_pnl': np.percentile(pnl, 5),
+        'p95_pnl': np.percentile(pnl, 95)
+    }
+    results_df = pd.DataFrame(pnl, columns=['pnl'])
+
+    return summary, results_df
+
+if __name__ == '__main__':
+    # Example usage
+    summary, results = simulate_hedge_pnl('mock_pipeline.csv')
+    print('Hedge Simulation Summary:')
+    for k, v in summary.items():
+        print(f"{k}: {v}")
